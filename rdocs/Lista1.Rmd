@@ -1,0 +1,343 @@
+---
+title: ''
+author: ''
+date: ''
+output:
+  pdf_document: null
+  fig_crop: no
+  html_document:
+    df_print: paged
+subtitle: ''
+highlight: tango
+number_sections: no
+fig_caption: yes
+keep_tex: yes
+includes:
+  in_header: Estilo.sty
+classoption: a4paper
+always_allow_html: yes
+---
+  
+  
+\begin{center}
+{\Large
+  DEPARTAMENTO DE ESTATÍSTICA} \\
+\vspace{0.5cm}
+\begin{figure}[!t]
+\centering
+\includegraphics[width=9cm, keepaspectratio]{logo-UnB.eps}
+\end{figure}
+\vskip 1em
+{\large
+  `r format(Sys.time(), '%d %B %Y')`}
+\vskip 3em
+{\LARGE
+  \textbf{Lista 1}} \\
+\vskip 5em
+{\Large
+  Prof. Dr. Donald Matthew Pianto} \\
+\vskip 1em
+{\Large
+  Aluno: Bruno Gondim Toledo} \\
+\vskip 1em
+{\Large
+  Matrícula: 15/0167636} \\
+\vskip 1em
+{\Large
+  Estatística Computacional} \\
+\vskip 1em
+{\Large
+  1º/2023} \\
+\vskip 1em
+\vskip 1em
+\end{center}
+
+\newpage
+
+```{r setup, include=FALSE}
+
+if (!require("pacman")) install.packages("pacman")
+p_load(knitr,tidyverse,doParallel,furrr,tictoc)
+
+cores <- detectCores()
+
+```
+
+# Questão 1
+
+```{r dados1, include=FALSE}
+dicionario <- read_csv("dados/Dicionario.txt", 
+    col_names = FALSE)
+
+colnames(dicionario) <- "palavras"
+```
+
+## a)
+
+### Resultado analítico:
+
+```{r q1analiticamente, echo=T}
+
+# Separando apenas as palavras com exatamente 5 letras
+
+pcl <- dicionario %>%
+  filter(str_length(palavras) == 5)%>%
+  mutate(palavras = tolower(str_replace_all(iconv(palavras, "latin1", "ASCII//TRANSLIT"), "[^[:alnum:]]", "")))
+
+# Como o exercicio cita que iremos trabalhar apenas com combinações de letras sem inclusão de caracteres especiais, optei por remover as palavras que são idêntias à outras salvo pela acentuação
+
+pcl <- pcl %>%
+  distinct()
+
+# 5481-5427
+
+# Com isso, estaremos trabalhando com 54 palavras a menos (palavras idêntias à outras, salvo por um caracter especial.)
+
+# Certificando a quantidade de letras para calcular a permutação
+letras <- dicionario %>%
+  mutate(letras = tolower(str_sub(palavras, 1, 1)))%>%
+  select(letras)%>%
+  distinct()
+
+# Então, sendo 26 letras diferentes, a quantidade de combinações possíveis com 5 letras é da ordem de:
+
+# 26*26*26*26*26
+
+# Ou seja,
+
+# 26^5
+
+# Como são 5427 palavras válidas de 5 letras, então a probabilidade de se obter uma combinação válida é de:
+
+prob <- 5427/(26^5)
+
+prob
+
+# 0.0004567653, ou seja, 0,04567653%.
+
+letras$prob <- seq(1, 26, by = 1) / 26
+
+
+```
+
+### Resultado com processos iterativos:
+
+```{r q1montecarlo, warning=FALSE,echo=T,cache=TRUE}
+
+probabilidade <- function(){
+  contador <- 0
+  existe <- FALSE
+  while (existe == FALSE) {
+    palavra <- NULL
+    for (i in 1:5){
+      u <- runif(1)
+      indice <- which.min(abs(letras$prob - u))
+      letra <- letras$letras[indice]
+      palavra <- paste0(palavra,letra)
+      }
+    existe <- any(grepl(palavra, pcl$palavras))
+    contador <- contador+1
+    }
+  rm(u,indice,i,letra,existe,palavra)
+  contador
+  }
+
+# probabilidade()
+# CF <- mean(map_dbl(1:5, ~probabilidade()))
+
+# Como minha função ficou pouco otimizada, vamos paralelizar para melhorar um pouco a velocidade, permitindo um pouco mais de iterações.
+
+# Testando as alternativas de paralelização
+
+# tic()
+# plan(multicore)
+# CF <- mean(future_map_dbl(1:10, ~probabilidade()))
+# toc()
+
+# tic()
+# plan(multisession, workers = cores)
+# CF <- mean(future_map_dbl(1:10, ~probabilidade()))
+# toc()
+
+# O multisession foi superior; aumentando o nível de iterações para a forma final:
+
+plan(multisession, workers = cores)
+CF <- mean(future_map_dbl(1:100, ~probabilidade()))
+
+1/CF
+
+# Pedi ao ChatGPT que otimizasse minha função. Este foi o output:
+
+probabilidade2 <- function(){
+  contador <- 0
+  existe <- FALSE
+  while (!existe) {
+    palavra <- paste0(sample(letras$letras, 5, replace = TRUE), collapse = "")
+    existe <- any(pcl$palavras == palavra)
+    contador <- contador + 1
+  }
+  contador
+}
+
+# probabilidade2()
+
+# De fato, roda bem mais rápido.
+
+# Testando a convergência desta:
+# (como ela é mais eficiente, dá para fazer mais iterações)
+plan(multisession, workers = cores)
+CF2 <- mean(future_map_dbl(1:300, ~probabilidade2()))
+1/CF2
+# Por algum motivo, a função do ChatGPT converge para o real valor melhor que a minha.
+
+```
+
+## b)
+
+### Resultado analítico:
+
+```{r q1banalitico, echo=T}
+
+# A quantidade de pseudo-palíndromos possíveis para uma palavra de 5 letras é de
+
+# 26*26*26*1*1
+# ou:
+# 26^3
+# = 17576
+
+# Visto que as 3 primeiras letras podem ser quaisquer, mas a penúltima deve ser igual a segunda (1 combinação possível) e a última deve ser igual a primeira (1 combinação possível).
+
+# Ou seja, das 26^5 combinações possíveis, apenas 26^3 serão palíndromos;
+
+(26^3)/(26^5)
+# = 0.00147929
+
+```
+### Resultado iterativo:
+
+```{r q1bmontecarlo, echo=T,warning=F,cache=T}
+
+# Para isso, tentarei aproveitar minha última função (a que eu fiz, não a do ChatGPT), adaptando alguns pontos.
+
+palindromo <- function(){
+  contador <- 0
+  check <- FALSE
+  while (check == FALSE) {
+    palavra <- NULL
+    for (i in 1:5){
+      u <- runif(1)
+      indice <- which.min(abs(letras$prob - u))
+      letra <- letras$letras[indice]
+      palavra <- paste0(palavra,letra)
+      }
+    espelho <- paste0(strsplit(palavra, "")[[1]][5:1], collapse = "")
+    check <- palavra == espelho
+    contador <- contador+1
+    }
+  rm(u,indice,i,letra,check,palavra)
+  contador
+  }
+
+# palindromo()
+
+#tic()
+plan(multisession, workers = cores)
+CFb <- mean(future_map_dbl(1:300, ~palindromo()))
+#toc()
+1/CFb
+
+
+```
+
+## c)
+
+```{r q1c, warning=FALSE, cache=TRUE}
+
+# Definindo vogais e consoantes:
+vogais <- c("a","e","i","o","u")
+consoantes <- letras$letras[-c(1,5,9,15,21)]
+
+# Construindo a função
+gerador <- function(){
+  contador <- 0
+  check <- FALSE
+  while(check==FALSE){
+    letra <- sample(letras$letras,1)
+    ifelse(letra %in% consoantes, letra2 <- sample(vogais,1),letra2 <- sample(consoantes,1))
+    ifelse(letra2 %in% consoantes, letra3 <- sample(vogais,1),letra3 <- sample(consoantes,1))
+    ifelse(letra3 %in% consoantes, letra4 <- sample(vogais,1),letra4 <- sample(consoantes,1))
+    ifelse(letra4 %in% consoantes, letra5 <- sample(vogais,1),letra5 <- sample(consoantes,1))
+    palavra <- paste0(letra,letra2,letra3,letra4,letra5,sep="")
+    rm(letra,letra2,letra3,letra4,letra5)
+    check <- any(palavra %in% pcl$palavras)
+    contador <- contador+1
+    }
+  check <- FALSE
+  contador
+}
+
+# gerador()
+
+# Iterando a função algumas vezes:
+plan(multisession, workers = cores)
+CF3 <- mean(future_map_dbl(1:500, ~gerador()))
+
+# Resultado:
+1/CF3
+
+```
+
+## d)
+
+```{r q1d_dados, include=FALSE}
+
+# Definindo o vetor de probabilidades, segundo as informações da Wikipedia
+freq <- read_delim("dados/freq.txt", 
+    delim = "\t", escape_double = FALSE)
+
+```
+
+
+```{r q1d, warning=FALSE, cache=TRUE}
+
+freq$Frequência <- gsub("%", "", freq$Frequência)
+freq$Frequência <- as.numeric(freq$Frequência)
+freq$Frequência <- freq$Frequência/100
+
+# Amostrando:
+
+acabou_a_criatividade_para_nome_de_funcao <- function(){
+  contador <- 0
+  check2 <- FALSE
+  while(check2 == FALSE){
+    letras <- sample(x=freq$Letra,size=5,prob = freq$Frequência)
+    palavra <- paste0(letras,collapse="")
+    check1 <- grepl("a", palavra)
+    if(check1 == TRUE){
+      check2 <- palavra %in% pcl$palavras
+      }
+    contador <- contador+1
+    }
+  contador
+  }
+
+# acabou_a_criatividade_para_nome_de_funcao()
+
+# Iterando a função algumas vezes:
+plan(multisession, workers = cores)
+CF4 <- mean(future_map_dbl(1:500, ~acabou_a_criatividade_para_nome_de_funcao()))
+
+# Resultado:
+1/CF4
+
+```
+
+Quanto à demonstração analítica, *Cuius rei demonstrationem mirabilem sane detexi hanc marginis exiguitas non caperet*
+
+# 2)
+
+## a)
+
+## b)
+
+## c)
