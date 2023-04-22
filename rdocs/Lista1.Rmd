@@ -338,6 +338,79 @@ Quanto à demonstração analítica, *Cuius rei demonstrationem mirabilem sane d
 
 ## a)
 
+```{r q2a}
+# usando a função quantílica (assim como no caso da exponencial do slide); e fixando gama=1;
+n<-1000
+u<-runif(n)
+z <- tan(pi * (u - 0.5))
+hist(z)
+
+#comparando com a distribuição "real"
+
+hist(rcauchy(1000))
+
+# Aparenta estar correto..
+
+```
+
+
 ## b)
 
-## c)
+```{r q2b}
+
+# Usando a runif
+u <- runif(1000)
+x <- case_when(
+  u < 0.2 ~ 2,
+  u >= 0.2 & u < 0.3 ~ 3,
+  u >= 0.3 & u < 0.5 ~ 5,
+  u >= 0.5 & u < 0.7 ~ 7,
+  u >= 0.7 ~ 9)
+
+# Gerando a tabela de frequências relativas observadas; após inserindo a frequência esperada
+df <- data.frame(factor(x)) %>%
+  rename(valor = 1)%>%
+  group_by(valor) %>%
+  summarise(n=n(),freq_observada = n/1000)
+df$freq_esperada <- c(.2,.1,.2,.2,.3)
+
+# Usando a função sample:
+df2 <- sample(x=c(2,3,5,7,9),size=1000,prob=c(.2,.1,.2,.2,.3),replace=T)
+
+# Criando a tabela dos numeros gerados pela segunda função
+
+df2 <- data.frame(factor(df2)) %>%
+  rename(valor = 1)%>%
+  group_by(valor) %>%
+  summarise(n=n(),freq_observada = n/1000)
+df2$freq_esperada <- c(.2,.1,.2,.2,.3)
+
+kable(df)
+kable(df2)
+
+
+```
+
+## c) Preciso arrumar essa ainda, tá bem ruim
+
+```{r q2c}
+
+
+x <- rcauchy(1000)
+y <- (x^2 + 1) / (2 * x)
+z <- qnorm(pnorm(y))
+# Como a dist. Cauchy tem média infinita, irei manualmente remover os valores gerados > 5
+hist(z)
+z <- z[(z > 5 | z > -5)]
+z <- z[!is.infinite(z)]
+hist(x)
+hist(z)
+hist(rnorm(1000))
+
+
+y <- (x - median(x)) / sd(x)
+z <- qnorm((atan(y / pi) + 0.5))
+hist(y)
+
+```
+
