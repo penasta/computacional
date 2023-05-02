@@ -54,10 +54,10 @@ always_allow_html: yes
 
 \newpage
 
-```{r setup, include=FALSE}
+```{r setup, include=T, echo=T}
 
 if (!require("pacman")) install.packages("pacman")
-p_load(knitr,tidyverse,doParallel,furrr,tictoc)
+p_load(knitr,tidyverse,doParallel,furrr,tictoc,ggpubr)
 
 cores <- detectCores()
 
@@ -65,7 +65,7 @@ cores <- detectCores()
 
 # Questão 1
 
-```{r dados1, include=FALSE}
+```{r dados1, include=T, echo=T}
 dicionario <- read_csv("dados/Dicionario.txt", 
     col_names = FALSE)
 
@@ -154,17 +154,29 @@ probabilidade <- function(){
 # CF <- mean(future_map_dbl(1:10, ~probabilidade()))
 # toc()
 
-# tic()
-# plan(multisession, workers = cores)
-# CF <- mean(future_map_dbl(1:10, ~probabilidade()))
-# toc()
+#tic()
+#plan(multisession, workers = cores)
+#CF <- mean(future_map_dbl(1:10, ~probabilidade()))
+#toc()
 
 # O multisession foi superior; aumentando o nível de iterações para a forma final:
 
 plan(multisession, workers = cores)
-CF <- mean(future_map_dbl(1:100, ~probabilidade()))
+CF <- future_map_dbl(1:1000, ~probabilidade())
 
-1/CF
+1/mean(CF)
+
+df <- data.frame(iteracao = 1:1000, probabilidade = sapply(CF, function(x) 1/x))
+df$media_acumulada <- cumsum(df$probabilidade) / seq_along(df$probabilidade)
+df$valor_real <- prob*10
+
+ggplot(df, aes(iteracao, media_acumulada)) +
+  geom_line() +
+  geom_hline(yintercept = 0.004567653, linetype = "dashed", color = "red") +
+  xlab("Iteração") +
+  ylab("Valor estimado") +
+  ggtitle("Convergência do valor estimado") +
+  scale_y_log10()
 
 # Pedi ao ChatGPT que otimizasse minha função. Este foi o output:
 
@@ -181,14 +193,30 @@ probabilidade2 <- function(){
 
 # probabilidade2()
 
+#tic()
+#plan(multisession, workers = cores)
+#CF <- mean(future_map_dbl(1:10, ~probabilidade2()))
+#toc()
+
+
 # De fato, roda bem mais rápido.
 
 # Testando a convergência desta:
 # (como ela é mais eficiente, dá para fazer mais iterações)
 plan(multisession, workers = cores)
-CF2 <- mean(future_map_dbl(1:300, ~probabilidade2()))
-1/CF2
-# Por algum motivo, a função do ChatGPT converge para o real valor melhor que a minha.
+CF2 <- future_map_dbl(1:2000, ~probabilidade2())
+1/mean(CF2)
+
+df2 <- data.frame(iteracao = 1:1000, probabilidade = sapply(CF2, function(x) 1/x))
+df2$media_acumulada <- cumsum(df2$probabilidade) / seq_along(df2$probabilidade)
+df2$valor_real <- prob*10
+
+ggplot(df2, aes(iteracao, media_acumulada)) +
+  geom_line() +
+  geom_hline(yintercept = 0.004567653, linetype = "dashed", color = "red") +
+  xlab("Iteração") +
+  ylab("Valor estimado") +
+  ggtitle("Convergência do valor estimado")
 
 ```
 
@@ -242,7 +270,7 @@ palindromo <- function(){
 
 #tic()
 plan(multisession, workers = cores)
-CFb <- mean(future_map_dbl(1:300, ~palindromo()))
+CFb <- mean(future_map_dbl(1:2000, ~palindromo()))
 #toc()
 1/CFb
 
@@ -251,7 +279,7 @@ CFb <- mean(future_map_dbl(1:300, ~palindromo()))
 
 ## c)
 
-```{r q1c, warning=FALSE, cache=TRUE}
+```{r q1c, warning=FALSE, cache=TRUE, echo=T}
 
 # Definindo vogais e consoantes:
 vogais <- c("a","e","i","o","u")
@@ -279,9 +307,10 @@ gerador <- function(){
 # gerador()
 
 # Iterando a função algumas vezes:
+#tic()
 plan(multisession, workers = cores)
-CF3 <- mean(future_map_dbl(1:500, ~gerador()))
-
+CF3 <- mean(future_map_dbl(1:2000, ~gerador()))
+#toc()
 # Resultado:
 1/CF3
 
@@ -289,20 +318,20 @@ CF3 <- mean(future_map_dbl(1:500, ~gerador()))
 
 ## d)
 
-```{r q1d_dados, include=FALSE}
+```{r q1d_dados, include=T, echo=T}
 
 # Definindo o vetor de probabilidades, segundo as informações da Wikipedia
 freq <- read_delim("dados/freq.txt", 
     delim = "\t", escape_double = FALSE)
-
+colnames(freq) <- c("letra","freq")
 ```
 
 
-```{r q1d, warning=FALSE, cache=TRUE}
+```{r q1d, warning=FALSE, cache=TRUE, echo=T}
 
-freq$Frequência <- gsub("%", "", freq$Frequência)
-freq$Frequência <- as.numeric(freq$Frequência)
-freq$Frequência <- freq$Frequência/100
+freq$freq <- gsub("%", "", freq$freq)
+freq$freq <- as.numeric(freq$freq)
+freq$freq <- freq$freq/100
 
 # Amostrando:
 
@@ -310,13 +339,13 @@ acabou_a_criatividade_para_nome_de_funcao <- function(){
   contador <- 0
   check2 <- FALSE
   while(check2 == FALSE){
-    letras <- sample(x=freq$Letra,size=5,prob = freq$Frequência)
+    letras <- sample(x=freq$letra,size=5,prob = freq$freq, replace = TRUE)
     palavra <- paste0(letras,collapse="")
     check1 <- grepl("a", palavra)
     if(check1 == TRUE){
       check2 <- palavra %in% pcl$palavras
+      contador <- contador+1
       }
-    contador <- contador+1
     }
   contador
   }
@@ -324,9 +353,10 @@ acabou_a_criatividade_para_nome_de_funcao <- function(){
 # acabou_a_criatividade_para_nome_de_funcao()
 
 # Iterando a função algumas vezes:
+#tic()
 plan(multisession, workers = cores)
-CF4 <- mean(future_map_dbl(1:500, ~acabou_a_criatividade_para_nome_de_funcao()))
-
+CF4 <- mean(future_map_dbl(1:2000, ~acabou_a_criatividade_para_nome_de_funcao()))
+#toc()
 # Resultado:
 1/CF4
 
@@ -338,7 +368,7 @@ Quanto à demonstração analítica, *Cuius rei demonstrationem mirabilem sane d
 
 ## a)
 
-```{r q2a}
+```{r q2a, echo=T}
 # usando a função quantílica (assim como no caso da exponencial do slide); e fixando gama=1;
 n<-1000
 u<-runif(n)
@@ -356,7 +386,7 @@ hist(rcauchy(1000))
 
 ## b)
 
-```{r q2b}
+```{r q2b, echo=T}
 
 # Usando a runif
 u <- runif(1000)
@@ -391,26 +421,59 @@ kable(df2)
 
 ```
 
-## c) Preciso arrumar essa ainda, tá bem ruim
+## c) 
 
-```{r q2c}
+```{r q2c, warning=FALSE, cache=TRUE, echo=T}
 
+# Irei tentar implementar o método de Rejeição de Von Neumann, tentando gerar valores de uma distribuição x a partir de uma distribuição y. No caso, x será a normal padrão e y será a cauchy padrão.
 
-x <- rcauchy(1000)
-y <- (x^2 + 1) / (2 * x)
-z <- qnorm(pnorm(y))
-# Como a dist. Cauchy tem média infinita, irei manualmente remover os valores gerados > 5
-hist(z)
-z <- z[(z > 5 | z > -5)]
-z <- z[!is.infinite(z)]
-hist(x)
-hist(z)
-hist(rnorm(1000))
+f <- function(x) dnorm(x, 0, 1)
+g <- function(x) dcauchy(x, 0, 1)
 
+C <- sqrt(2 * pi/exp(1)) # Ajustando uma constante C para ajustar a escala da distribuição cauchy para que ela cubra a distribuição normal padrão.
 
-y <- (x - median(x)) / sd(x)
-z <- qnorm((atan(y / pi) + 0.5))
-hist(y)
+N <- 5000 # Definindo o número de observações
+x <- numeric(N)
+i <- 1
+
+while (i <= N) {
+  y <- rcauchy(n = 1)
+  u <- runif(n = 1)
+  if (u < f(y)/(C * g(y))) {
+    x[i] <- y
+    i <- i + 1
+  }
+}
+
+qqnorm(x)
+ggdensity(x)
+shapiro.test(x)
+
+# Os testes não rejeitam a hipótese nula de normalidade da variável.
+
+# Fazendo a versão paralelizada, para testar com um conjunto maior de pontos.
+
+set.seed(150167636)
+#tic()
+x <- future_map_dbl(.x = 1:100000, ~{
+  y <- rcauchy(n = 1)
+  u <- runif(n = 1)
+  if (u < dnorm(y, 0, 1)/(C * dcauchy(y, 0, 1))) {
+    y
+  } else {
+    NA_real_
+  }
+})
+x <- na.omit(x)
+#toc()
+
+# Neste caso não é possível executar o teste Shapiro-Wilk pela quantidade de
+# observações ser muito grande. Então ficaremos apenas com as representações visuais
+
+qqnorm(x)
+ggdensity(x)
+
+# Pelos gráficos Q-Q e densidade observada, aparenta ter funcionado.
 
 ```
 

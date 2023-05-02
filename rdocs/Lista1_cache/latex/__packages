@@ -16,3 +16,4 @@ doParallel
 future
 furrr
 tictoc
+ggpubr
