@@ -1,0 +1,239 @@
+---
+title: ''
+author: ''
+date: ''
+output:
+  pdf_document: null
+  fig_crop: no
+  html_document:
+    df_print: paged
+subtitle: ''
+highlight: tango
+number_sections: no
+fig_caption: yes
+keep_tex: yes
+includes:
+  in_header: Estilo.sty
+classoption: a4paper
+always_allow_html: yes
+---
+  
+  
+\begin{center}
+{\Large
+  DEPARTAMENTO DE ESTATÍSTICA} \\
+\vspace{0.5cm}
+\begin{figure}[!t]
+\centering
+\includegraphics[width=9cm, keepaspectratio]{logo-UnB.eps}
+\end{figure}
+\vskip 1em
+{\large
+  `r format(Sys.time(), '%d %B %Y')`}
+\vskip 3em
+{\LARGE
+  \textbf{Lista 2}} \\
+\vskip 5em
+{\Large
+  Prof. Dr. Donald Matthew Pianto} \\
+\vskip 1em
+{\Large
+  Aluno: Bruno Gondim Toledo} \\
+\vskip 1em
+{\Large
+  Matrícula: 15/0167636} \\
+\vskip 1em
+{\Large
+  Estatística Computacional} \\
+\vskip 1em
+{\Large
+  1º/2023} \\
+\vskip 1em
+\vskip 1em
+\end{center}
+
+\newpage
+
+```{r setup, include=T, echo=T}
+
+if (!require("pacman")) install.packages("pacman")
+p_load(knitr,tidyverse,doParallel,furrr,tictoc,ggpubr,beepr)
+cores <- detectCores()
+dados <- read_rds("dados/dados.rds")
+
+```
+
+# Questão 1
+
+## a)
+```{r q1a, cache=TRUE}
+
+# "Bootstrap"?
+
+# "Analítica"
+m1 <- dados %>%
+  filter(Rota == "Disappointment Cleaver") %>%
+  summarise(lambda = mean(Sucessos)) %>%
+  pull()
+
+m2 <- dados %>%
+  filter(Rota != "Disappointment Cleaver") %>%
+  summarise(lambda = mean(Sucessos)) %>%
+  pull()
+
+dif_a <- m1-m2
+
+dados %>%
+  filter(Rota == "Disappointment Cleaver") %>%
+  tally()
+
+# Simulação:
+rotas <- dados %>%
+  filter(Rota != "Disappointment Cleaver") %>%
+  select(Sucessos)
+
+DC <- dados %>%
+  filter(Rota == "Disappointment Cleaver") %>%
+  select(Sucessos)
+
+N <- 10000
+dif <- numeric(N)
+for (i in 1:N){
+media1 <- sample(DC$Sucessos,size=10,replace=T)
+media2 <- sample(rotas$Sucessos,size=10,replace=T)
+
+media1 <- mean(media1)
+media2 <- mean(media2)
+
+dif[i] <- abs(media1 - media2)
+}
+# Média:
+mean(dif)
+
+# Probabilidade das médias serem iguais:
+mean(dif)/N
+
+```
+
+## b)
+
+```{r q1b, cache=TRUE}
+
+# B)
+
+lv <- function(papb,ti,ns){
+  l <- exp(papb[1]+papb[2]*ti)
+  sum(dpois(ns,l,log=T))
+  }
+
+parametross <- optim(c(0,0),
+                    function(.) -lv(., ti=dados$Temperatura, ns=dados$Sucessos))$`par`
+
+# Estimadores de máxima verossimilhança de alpha e beta; respectivamente:
+parametross
+
+```
+
+## c)
+
+```{r q1c, cache=TRUE}
+
+# c) ti=15 ~ poisson (l=)
+
+lv <- function(papb,ti,ns){
+  l <- exp(papb[1]+papb[2]*ti)
+  sum(dpois(ns,l,log=T))
+  }
+
+parametros <- optim(c(0,0),
+                    function(.) -lv(., ti=15, ns=dados$Sucessos))$`par`
+
+# Estimadores de máxima verossimilhança de alpha e beta; respectivamente:
+parametros
+
+lambda <- exp(parametros[1]+parametros[2]*15)  # Parâmetro lambda
+
+# estimativa da distribuição de probabilidade para os valores de x de 0 a 25
+x <- 0:25
+probabilidade <- dpois(x, lambda)
+
+plot(x, probabilidade)
+
+```
+
+## d)
+
+```{r q1d}
+
+sucessos <- numeric()
+beta_estim <- numeric()
+MSE <- numeric()
+
+lv <- function(papb,ti,ns){
+  l <- exp(papb[1]+papb[2]*ti)
+  sum(dpois(ns,l,log=T))
+  }
+
+tic()
+for(I in 1:1000){
+for(i in 1:nrow(dados)){
+sucessos[i] <- rpois(n=1,lambda=exp(parametross[1]+parametross[2]*dados$Temperatura[i]))}
+
+Parametros <- optim(c(0,0),
+                    function(.) -lv(., ti=dados$Temperatura, ns=sucessos))$`par`
+beta_estim[I] <- Parametros[2]
+MSE[I] <- mean((sucessos-exp(parametross[1]+parametross[2]*dados$Temperatura))^2)
+
+sucessos <- numeric()
+}
+toc()
+
+X <- exp(beta_estim)
+
+summary(X)
+
+# Intervalo 95% conf.
+quantile(X, probs= (0.025))
+quantile(X, probs= (0.975))
+
+
+```
+
+## e)
+
+```{r q1e}
+# continuar esta parte
+
+MSE
+mean(MSE)
+
+```
+
+
+# 2)
+
+```{r q2, cache=TRUE}
+# Definindo a função que verifica se um ponto está dentro da elipsoide
+pontos_dentro <- function(x, y, z) {
+  (x^2/2) + (y^2/3) + (z^2/4) <= 1
+}
+
+# definindo nº de pontos
+N <- 10000000
+
+# gerando os valores de x,y e z no limite da elipsoide
+x <- runif(N, min = -1, max = 1)
+y <- runif(N, min = -1, max = 1)
+z <- runif(N, min = -1, max = 1)
+
+# Contando quantos pontos estão dentro da elipsoide
+dentro <- sum(pontos_dentro(x, y, z))
+
+# Calculando a proporção de pontos dentro da elipsoide em relação ao total gerado
+prop <- dentro / N
+
+volume_elipsoide <- prop * 8 # Volume do cubo que circunscreve a elipsoide (2 * 2 * 2)
+volume_elipsoide
+
+```
+
