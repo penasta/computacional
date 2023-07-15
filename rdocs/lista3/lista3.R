@@ -1,15 +1,18 @@
 # --------------------------------------------------------------------------- #
+seed <- 150167636
+pacman::p_load(tidyverse,car,mvtnorm,e1071,mlbench,caret)
+# --------------------------------------------------------------------------- #
 
 # 1) Rizzo – 3.14
 
 n <- 200
 mu <- c(0,1,2)
+set.seed(seed)
 Sigma <- matrix(c(1, -.5, .5,
                   -.5,1,-.5,
                   .5,-.5,1), 
                 nrow = 3, ncol = 3)
 
-pacman::p_load(car,mvtnorm)
 
 r <- rmvnorm(n, mean = mu, sigma=Sigma, method="chol")
 
@@ -23,9 +26,7 @@ cor(r)
 
 # 2) Rizzo – 5.7 (não precisa comparar com o valor teórico de 5.6)
 
-# Exemplo 5.7:
-
-m <- 10000
+m <- seed
 a <- - 12 + 6 * (exp(1) - 1)
 U <- runif(m)
 T1 <- exp(U) #simple MC
@@ -36,20 +37,15 @@ mean(T2)
 
 (var(T1) - var(T2)) / var(T1)
 
-# Exercício 5.7:
-
-# copiar o exemplo???
-
 # --------------------------------------------------------------------------- #
 
 # 3) Validação Cruzada (usa os códigos no final para iniciar)
 
-pacman::p_load(e1071,mlbench)
 data(Glass, package="mlbench")
 ## split data into a train and test set
 index <- 1:nrow(Glass)
 N <- trunc(length(index)/3)
-set.seed(150167636)
+set.seed(seed)
 testindex <- sample(index, N)
 testset <- Glass[testindex,]
 trainset <- Glass[-testindex,]
@@ -57,13 +53,13 @@ trainset <- Glass[-testindex,]
 svm.model <- svm(Type ~ ., data = trainset, cost = 100, gamma = 0.1)
 svm.pred <- predict(svm.model, testset[,-10])
 ## compute svm confusion matrix
-table(pred = svm.pred, true = testset[,10])
+matriz_confusao <- table(pred = svm.pred, true = testset[,10])
+(matriz_confusao <- as.matrix(matriz_confusao))
 
 # a. Fixando o cost = 100 (penalidade para furar a margem do SVM), determine via k-fold 
 # validação cruzada com k=10, o melhor valor para gamma (a largura de banda do kernel)
 # e reporta esse valor e o erro de teste.
 
-pacman::p_load(caret)
 ctrl <- trainControl(method = "cv", number = 10)
 
 model <- train(Type ~ RI + Na + Mg + Al + Si + K + Ca + Ba + Fe, data = Glass, trControl = ctrl)
@@ -71,14 +67,18 @@ print(model)
 
 model$finalModel
 
-# Ou seja, o melhor valor para gamma aparenta ser 0,72; enquanto o erro do teste ficou na casa de 20%.
+# Ou seja, o melhor valor para gamma aparenta ser entre 0 e 1; enquanto o erro do teste ficou na casa de 20%.
 
 # b. Agora otimiza o custo e gamma simultaneamente usando a mesma validação cruzada.
 # Reporta os valores do custo, do gamma e do erro de teste.
 
-svm(Type ~ ., data = Glass, cost = 100, gamma = 0.72)
+#predict(model)
 
-# ???
+svm(Type ~ ., data = Glass, cost = 100, gamma = c(0.01, 0.1 ,1))
+svm(Type ~ ., data = Glass, cost = 100, gamma = c(0.001, 0.05 ,0.15))
+
+# Ou seja, o melhor valor de gama:
+svm(Type ~ ., data = Glass, cost = 100, gamma = 0.1)
 
 # --------------------------------------------------------------------------- #
 
@@ -108,7 +108,28 @@ quantile(teste[["x"]][1000:2000])
 cauchy <- rcauchy(1000)
 quantile(cauchy)
 
-# bem ruim
+plot(density(teste$x), main = "Valores gerados", xlab = "x", ylab = "Density", col = "#a11d21",
+     xlim = c(-10,10))
+
+set.seed(seed)
+plot(density(rcauchy(1000, location = 0, scale = 1)), main = "Valores gerados", xlab = "x", ylab = "Density", col = "#a11d21",
+     xlim = c(-10,10))
+
+x <- seq(-10, 10, length.out = 2000)
+plot(x,dcauchy(x, location = 0, scale = 1), main = "Valores gerados", xlab = "x", ylab = "Density", col = "#a11d21",
+     xlim = c(-10,10))
+
+
+set.seed(seed)
+plot(density(rcauchy(2000, location = 0, scale = 1)), type = "l",
+     xlab = "x", ylab = "Densidade",
+     main = "Função densidade da distribuição Cauchy e dos valores gerados",
+     xlim = c(-10,10))
+lines(density(teste$x), col = "#a11d21")
+lines(density(dcauchy(x, location = 0, scale = 1)), col = "blue")
+legend( legend = c("Simulação Cauchy Metropolis-Hasting",
+                   "Quantis teóricos da Cauchy padrão", "Simulação Cauchy Padrão `rcauchy`"),
+        col = c("#a11d21","blue", "black"), lty = 1, cex = .75, x = 1.3, y = .95)
 
 # 9.7:
 
@@ -140,12 +161,15 @@ summary(fit)
 
 shapiro.test(fit$residuals) # normalidade ok
 
-bartlett.test(fit$residuals) # grupos?
+plot(fit$fitted.values, fit$residuals,
+     xlab = "Valores ajustados", ylab = "Resíduos") # variância ok
+
+# Gráfico de dispersão + linha de mínimos quadrados (regressão)
+plot(df$X1, df$X2, main = "Regressão Linear", xlab = "X", ylab = "Y")
+abline(fit, col = "blue")
 
 # --------------------------------------------------------------------------- #
 
 # Bônus:
-
-
 
 # --------------------------------------------------------------------------- #
